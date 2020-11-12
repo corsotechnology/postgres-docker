@@ -68,6 +68,14 @@ ENV RESTORE_SWIFT_PREFIX ""
 
 ENV ARCHIVE_FILE_PREFIX ""
 ENV RESTORE_FILE_PREFIX ""
+# Maintenance tasks
+# vacuum all databases every night (full vacuum on Sunday night, lazy vacuum every other night)
+RUN echo -n "45 3 * * 0 root nice -n 19 su - postgres -c \"vacuumdb --all --full --analyze\"">>/tmp/job.txt
+RUN echo -n "45 3 * * 1-6 root nice -n 19 su - postgres -c \"vacuumdb --all --analyze --quiet\"">>/tmp/job.txt
+
+# re-index all databases once a week
+RUN echo -n "0 3 * * 0 root nice -n 19 su - postgres -c 'psql -t -c \"select datname from pg_database order by datname;\" | xargs -n 1 -I\"{}\" -- psql -U postgres {} -c \"reindex database {};\"'">>/tmp/job.txt
+RUN crontab /tmp/job.txt
 
 ENTRYPOINT ["pg-leader-election"]
 
